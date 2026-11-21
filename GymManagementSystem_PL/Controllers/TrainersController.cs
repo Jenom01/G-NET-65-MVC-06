@@ -1,5 +1,7 @@
-﻿using GymManagementSystem_BLL.Services;
+﻿using GymManagementSystem_BLL.Results;
+using GymManagementSystem_BLL.Services;
 using GymManagementSystem_BLL.ViewModels.Trainers;
+using GymManagementSystem_PL.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GymManagementSystem_PL.Controllers
@@ -21,77 +23,58 @@ namespace GymManagementSystem_PL.Controllers
 
             var result = await trainers.CreateAsync(model, ct);
 
-            switch (result)
+            if (result.IsFailure)
             {
-                case TrainerResult.EmailExists:
-                    ModelState.AddModelError(nameof(model.Email), "This email is already used");
-                    return View(model);
-
-                case TrainerResult.PhoneExists:
-                    ModelState.AddModelError(nameof(model.Phone), "This phone number is already used");
-                    return View(model);
-
-                default:
-                    TempData["Success"] = "Trainer created successfully";
-                    return RedirectToAction(nameof(Index));
+                ModelState.AddError(result.Error);
+                return View(model);
             }
+
+            TempData["Success"] = "Trainer created successfully";
+            return RedirectToAction(nameof(Index));
         }
 
         [HttpGet]
         public async Task<IActionResult> Details(int id, CancellationToken ct)
         {
-            var trainer = await trainers.GetDetailsAsync(id, ct);
+            var result = await trainers.GetDetailsAsync(id, ct);
 
-            if (trainer is null) return NotFound();
-
-            return View(trainer);
+            return result.IsFailure ? NotFound() : View(result.Value);
         }
 
         [HttpGet]
         public async Task<IActionResult> Edit(int id, CancellationToken ct)
         {
-            var trainer = await trainers.GetForUpdateAsync(id, ct);
+            var result = await trainers.GetForUpdateAsync(id, ct);
 
-            if (trainer is null) return NotFound();
-
-            return View(trainer);
+            return result.IsFailure ? NotFound() : View(result.Value);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, TrainerEditViewModel model, CancellationToken ct)
+        public async Task<IActionResult> Edit([FromRoute] int id, TrainerEditViewModel model, CancellationToken ct)
         {
             if (!ModelState.IsValid) return View(model);
 
             var result = await trainers.UpdateAsync(id, model, ct);
 
-            switch (result)
+            if (result.IsSuccess)
             {
-                case TrainerResult.NotFound:
-                    return NotFound();
-
-                case TrainerResult.EmailExists:
-                    ModelState.AddModelError(nameof(model.Email), "This email is already used");
-                    return View(model);
-
-                case TrainerResult.PhoneExists:
-                    ModelState.AddModelError(nameof(model.Phone), "This phone number is already used");
-                    return View(model);
-
-                default:
-                    TempData["Success"] = "Trainer updated successfully";
-                    return RedirectToAction(nameof(Index));
+                TempData["Success"] = "Trainer updated successfully";
+                return RedirectToAction(nameof(Index));
             }
+
+            if (result.Error.Type == ErrorType.NotFound) return NotFound();
+
+            ModelState.AddError(result.Error);
+            return View(model);
         }
 
         [HttpGet]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
         {
-            var trainer = await trainers.GetDetailsAsync(id, ct);
+            var result = await trainers.GetDetailsAsync(id, ct);
 
-            if (trainer is null) return NotFound();
-
-            return View(trainer);
+            return result.IsFailure ? NotFound() : View(result.Value);
         }
 
         [HttpPost]
@@ -101,23 +84,12 @@ namespace GymManagementSystem_PL.Controllers
         {
             var result = await trainers.DeleteAsync(id, ct);
 
-            switch (result)
-            {
-                case TrainerResult.NotFound:
-                    return NotFound();
+            if (result.IsFailure && result.Error.Type == ErrorType.NotFound) return NotFound();
 
-                case TrainerResult.HasSessions:
-                    TempData["Error"] = "Cannot delete a trainer who has scheduled sessions";
-                    break;
-
-                case TrainerResult.Success:
-                    TempData["Success"] = "Trainer deleted successfully";
-                    break;
-
-                default:
-                    TempData["Error"] = "Something went wrong";
-                    break;
-            }
+            if (result.IsSuccess)
+                TempData["Success"] = "Trainer deleted successfully";
+            else
+                TempData["Error"] = result.Error.Message;
 
             return RedirectToAction(nameof(Index));
         }
