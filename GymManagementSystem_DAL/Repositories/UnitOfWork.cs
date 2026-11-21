@@ -7,6 +7,7 @@ namespace GymManagementSystem_DAL.Repositories
     {
         private IMemberRepository? _members;
         private IPlanRepository? _plans;
+        private ISessionRepository? _sessions;
         private ITrainerRepository? _trainers;
         private IGenericRepository<HealthRecord>? _healthRecords;
 
@@ -15,6 +16,9 @@ namespace GymManagementSystem_DAL.Repositories
 
         public IPlanRepository Plans
             => _plans ??= new PlanRepository(dbContext);
+
+        public ISessionRepository Sessions
+            => _sessions ??= new SessionRepository(dbContext);
 
         public ITrainerRepository Trainers
             => _trainers ??= new TrainerRepository(dbContext);

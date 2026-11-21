@@ -9,6 +9,7 @@ namespace GymManagementSystem_BLL
         {
             services.AddScoped<IPlanService, PlanService>();
             services.AddScoped<IMemberService, MemberService>();
+            services.AddScoped<ISessionService, SessionService>();
             services.AddScoped<ITrainerService, TrainerService>();
 
             services.AddAutoMapper(cfg => cfg.AddMaps(typeof(DependencyInjection).Assembly));

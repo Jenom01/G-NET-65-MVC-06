@@ -1,4 +1,6 @@
-﻿namespace GymManagementSystem_DAL.Models
+﻿using GymManagementSystem_DAL.Enums;
+
+namespace GymManagementSystem_DAL.Models
 {
     public class Session : BaseEntity
     {
@@ -14,5 +16,10 @@
         public Category Category { get; set; } = default!;
 
         public ICollection<Booking> Bookings { get; set; } = [];
+
+        public SessionStatus GetStatus(DateTime now)
+            => StartDate > now ? SessionStatus.Upcoming
+             : EndDate > now ? SessionStatus.Ongoing
+             : SessionStatus.Completed;
     }
 }

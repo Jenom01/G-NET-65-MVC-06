@@ -6,6 +6,7 @@ namespace GymManagementSystem_DAL.Repositories
     {
         IMemberRepository Members { get; }
         IPlanRepository Plans { get; }
+        ISessionRepository Sessions { get; }
         ITrainerRepository Trainers { get; }
         IGenericRepository<HealthRecord> HealthRecords { get; }
 
