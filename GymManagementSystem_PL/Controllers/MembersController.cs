@@ -1,5 +1,7 @@
-﻿using GymManagementSystem_BLL.Services;
+﻿using GymManagementSystem_BLL.Results;
+using GymManagementSystem_BLL.Services;
 using GymManagementSystem_BLL.ViewModels.Members;
+using GymManagementSystem_PL.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GymManagementSystem_PL.Controllers
@@ -21,50 +23,38 @@ namespace GymManagementSystem_PL.Controllers
 
             var result = await members.CreateAsync(model, ct);
 
-            switch (result)
+            if (result.IsFailure)
             {
-                case MemberResult.EmailExists:
-                    ModelState.AddModelError(nameof(model.Email), "This email is already used");
-                    return View(model);
-
-                case MemberResult.PhoneExists:
-                    ModelState.AddModelError(nameof(model.Phone), "This phone number is already used");
-                    return View(model);
-
-                default:
-                    TempData["Success"] = "Member created successfully";
-                    return RedirectToAction(nameof(Index));
+                ModelState.AddError(result.Error);
+                return View(model);
             }
+
+            TempData["Success"] = "Member created successfully";
+            return RedirectToAction(nameof(Index));
         }
 
         [HttpGet]
         public async Task<IActionResult> Details(int id, CancellationToken ct)
         {
-            var member = await members.GetDetailsAsync(id, ct);
+            var result = await members.GetDetailsAsync(id, ct);
 
-            if (member is null) return NotFound();
-
-            return View(member);
+            return result.IsFailure ? NotFound() : View(result.Value);
         }
 
         [HttpGet]
         public async Task<IActionResult> HealthRecordDetails(int id, CancellationToken ct)
         {
-            var healthRecord = await members.GetHealthRecordAsync(id, ct);
+            var result = await members.GetHealthRecordAsync(id, ct);
 
-            if (healthRecord is null) return NotFound();
-
-            return View(healthRecord);
+            return result.IsFailure ? NotFound() : View(result.Value);
         }
 
         [HttpGet]
         public async Task<IActionResult> Edit(int id, CancellationToken ct)
         {
-            var member = await members.GetForUpdateAsync(id, ct);
+            var result = await members.GetForUpdateAsync(id, ct);
 
-            if (member is null) return NotFound();
-
-            return View(member);
+            return result.IsFailure ? NotFound() : View(result.Value);
         }
 
         [HttpPost]
@@ -75,33 +65,24 @@ namespace GymManagementSystem_PL.Controllers
 
             var result = await members.UpdateAsync(id, model, ct);
 
-            switch (result)
+            if (result.IsSuccess)
             {
-                case MemberResult.EmailExists:
-                    ModelState.AddModelError(nameof(model.Email), "This email is already used");
-                    return View(model);
-
-                case MemberResult.PhoneExists:
-                    ModelState.AddModelError(nameof(model.Phone), "This phone number is already used");
-                    return View(model);
-
-                case MemberResult.NotFound:
-                    return NotFound();
-
-                default:
-                    TempData["Success"] = "Member updated successfully";
-                    return RedirectToAction(nameof(Index));
+                TempData["Success"] = "Member updated successfully";
+                return RedirectToAction(nameof(Index));
             }
+
+            if (result.Error.Type == ErrorType.NotFound) return NotFound();
+
+            ModelState.AddError(result.Error);
+            return View(model);
         }
 
         [HttpGet]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
         {
-            var member = await members.GetDetailsAsync(id, ct);
+            var result = await members.GetDetailsAsync(id, ct);
 
-            if (member is null) return NotFound();
-
-            return View(member);
+            return result.IsFailure ? NotFound() : View(result.Value);
         }
 
         [HttpPost]
@@ -111,23 +92,12 @@ namespace GymManagementSystem_PL.Controllers
         {
             var result = await members.DeleteAsync(id, ct);
 
-            switch (result)
-            {
-                case MemberResult.NotFound:
-                    return NotFound();
+            if (result.IsFailure && result.Error.Type == ErrorType.NotFound) return NotFound();
 
-                case MemberResult.HasActiveBookings:
-                    TempData["Error"] = "Cannot delete a member with active bookings";
-                    break;
-
-                case MemberResult.Success:
-                    TempData["Success"] = "Member deleted successfully";
-                    break;
-
-                default:
-                    TempData["Error"] = "Something went wrong";
-                    break;
-            }
+            if (result.IsSuccess)
+                TempData["Success"] = "Member deleted successfully";
+            else
+                TempData["Error"] = result.Error.Message;
 
             return RedirectToAction(nameof(Index));
         }
