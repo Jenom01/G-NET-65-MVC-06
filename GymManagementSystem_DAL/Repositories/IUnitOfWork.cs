@@ -1,0 +1,14 @@
+﻿using GymManagementSystem_DAL.Models;
+
+namespace GymManagementSystem_DAL.Repositories
+{
+    public interface IUnitOfWork
+    {
+        IMemberRepository Members { get; }
+        IPlanRepository Plans { get; }
+        ITrainerRepository Trainers { get; }
+        IGenericRepository<HealthRecord> HealthRecords { get; }
+
+        Task<int> SaveChangesAsync(CancellationToken ct = default);
+    }
+}
