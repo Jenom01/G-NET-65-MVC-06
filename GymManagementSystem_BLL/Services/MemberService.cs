@@ -1,14 +1,17 @@
 ﻿using AutoMapper;
 using GymManagementSystem_BLL.Errors;
+using GymManagementSystem_BLL.Helpers;
 using GymManagementSystem_BLL.Results;
 using GymManagementSystem_BLL.ViewModels.HealthRecords;
 using GymManagementSystem_BLL.ViewModels.Members;
 using GymManagementSystem_DAL.Models;
 using GymManagementSystem_DAL.Repositories;
+using Microsoft.Extensions.Logging;
 
 namespace GymManagementSystem_BLL.Services
 {
-    public class MemberService(IUnitOfWork uow, IMapper mapper) : IMemberService
+    public class MemberService(IUnitOfWork uow, IMapper mapper, ILogger<MemberService> logger)
+        : IMemberService
     {
         public async Task<IEnumerable<MemberIndexViewModel>> GetAllAsync(CancellationToken ct = default)
             => mapper.Map<IEnumerable<MemberIndexViewModel>>(await uow.Members.GetAllAsync(ct));
@@ -19,14 +22,16 @@ namespace GymManagementSystem_BLL.Services
             model.Phone = model.Phone.Trim();
 
             if (await uow.Members.IsEmailTakenAsync(model.Email, ct: ct))
-                return MemberErrors.EmailExists;
+                return logger.Rejected("Create member", MemberErrors.EmailExists);
 
             if (await uow.Members.IsPhoneTakenAsync(model.Phone, ct: ct))
-                return MemberErrors.PhoneExists;
+                return logger.Rejected("Create member", MemberErrors.PhoneExists);
 
-            uow.Members.Add(mapper.Map<Member>(model));
+            var member = mapper.Map<Member>(model);
+            uow.Members.Add(member);
             await uow.SaveChangesAsync(ct);
 
+            logger.LogInformation("Member {MemberId} created", member.Id);
             return Result.Success();
         }
 
@@ -88,14 +93,15 @@ namespace GymManagementSystem_BLL.Services
             model.Phone = model.Phone.Trim();
 
             if (await uow.Members.IsEmailTakenAsync(model.Email, member.Id, ct))
-                return MemberErrors.EmailExists;
+                return logger.Rejected("Update member", MemberErrors.EmailExists, id);
 
             if (await uow.Members.IsPhoneTakenAsync(model.Phone, member.Id, ct))
-                return MemberErrors.PhoneExists;
+                return logger.Rejected("Update member", MemberErrors.PhoneExists, id);
 
             mapper.Map(model, member);
             await uow.SaveChangesAsync(ct);
 
+            logger.LogInformation("Member {MemberId} updated", id);
             return Result.Success();
         }
 
@@ -106,7 +112,7 @@ namespace GymManagementSystem_BLL.Services
             if (member is null) return MemberErrors.NotFound;
 
             if (await uow.Members.HasActiveBookingsAsync(id, ct))
-                return MemberErrors.HasActiveBookings;
+                return logger.Rejected("Delete member", MemberErrors.HasActiveBookings, id);
 
             if (member.HealthRecord is not null)
                 uow.HealthRecords.Delete(member.HealthRecord);
@@ -114,6 +120,7 @@ namespace GymManagementSystem_BLL.Services
             uow.Members.Delete(member);
             await uow.SaveChangesAsync(ct);
 
+            logger.LogInformation("Member {MemberId} deleted", id);
             return Result.Success();
         }
     }

@@ -1,12 +1,15 @@
 ﻿using AutoMapper;
 using GymManagementSystem_BLL.Errors;
+using GymManagementSystem_BLL.Helpers;
 using GymManagementSystem_BLL.Results;
 using GymManagementSystem_BLL.ViewModels.Plans;
 using GymManagementSystem_DAL.Repositories;
+using Microsoft.Extensions.Logging;
 
 namespace GymManagementSystem_BLL.Services
 {
-    public class PlanService(IUnitOfWork uow, IMapper mapper) : IPlanService
+    public class PlanService(IUnitOfWork uow, IMapper mapper, ILogger<PlanService> logger)
+        : IPlanService
     {
         public async Task<IEnumerable<PlanViewModel>> GetAllAsync(CancellationToken ct = default)
             => mapper.Map<IEnumerable<PlanViewModel>>(await uow.Plans.GetAllAsync(ct));
@@ -36,11 +39,12 @@ namespace GymManagementSystem_BLL.Services
             if (plan is null) return PlanErrors.NotFound;
 
             if (await uow.Plans.HasActiveMembershipsAsync(id, ct))
-                return PlanErrors.CannotUpdateWithActiveMemberships;
+                return logger.Rejected("Update plan", PlanErrors.CannotUpdateWithActiveMemberships, id);
 
             mapper.Map(model, plan);
             await uow.SaveChangesAsync(ct);
 
+            logger.LogInformation("Plan {PlanId} updated", id);
             return Result.Success();
         }
 
@@ -51,11 +55,12 @@ namespace GymManagementSystem_BLL.Services
             if (plan is null) return PlanErrors.NotFound;
 
             if (plan.IsActive && await uow.Plans.HasActiveMembershipsAsync(id, ct))
-                return PlanErrors.CannotDeactivateWithActiveMemberships;
+                return logger.Rejected("Deactivate plan", PlanErrors.CannotDeactivateWithActiveMemberships, id);
 
             plan.IsActive = !plan.IsActive;
             await uow.SaveChangesAsync(ct);
 
+            logger.LogInformation("{PlanName} plan is now {Status}", plan.Name, plan.IsActive ? "active" : "inactive");
             return Result.Success();
         }
     }
