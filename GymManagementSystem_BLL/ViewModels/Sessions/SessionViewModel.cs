@@ -1,4 +1,6 @@
-﻿using GymManagementSystem_DAL.Enums;
+﻿using GymManagementSystem_BLL.Helpers;
+using GymManagementSystem_DAL.Enums;
+using System.Globalization;
 
 namespace GymManagementSystem_BLL.ViewModels.Sessions
 {
@@ -19,11 +21,20 @@ namespace GymManagementSystem_BLL.ViewModels.Sessions
         public int AvailableSlots => Math.Max(Capacity - BookedCount, 0);
         public bool IsFull => AvailableSlots == 0;
 
+        public string AvailabilityDisplay
+            => IsFull ? "Full" : $"{AvailableSlots} of {Capacity} slots left";
+
         public string DateDisplay
-            => $"{StartDate:MMM dd, yyyy}";
+            => StartDate.ToString(DateFormats.Display, CultureInfo.InvariantCulture);
 
         public string TimeRangeDisplay
-            => $"{StartDate:hh:mm tt} - {EndDate:hh:mm tt}";
+            => $"{StartDate.ToString("hh:mm tt", CultureInfo.InvariantCulture)} - {EndDate.ToString("hh:mm tt", CultureInfo.InvariantCulture)}";
+
+        public string StartDisplay
+            => StartDate.ToString($"{DateFormats.Display}, hh:mm tt", CultureInfo.InvariantCulture);
+
+        public string EndDisplay
+            => EndDate.ToString($"{DateFormats.Display}, hh:mm tt", CultureInfo.InvariantCulture);
 
         public string DurationDisplay
         {

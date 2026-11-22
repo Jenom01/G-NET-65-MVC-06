@@ -2,8 +2,9 @@
 
 namespace GymManagementSystem_DAL.Repositories
 {
-    public interface ISessionRepository
+    public interface ISessionRepository : IGenericRepository<Session>
     {
         Task<IReadOnlyList<Session>> GetAllWithDetailsAsync(CancellationToken ct = default);
+        Task<Session?> GetDetailsAsync(int id, CancellationToken ct = default);
     }
 }
