@@ -7,5 +7,7 @@ namespace GymManagementSystem_BLL.Services
     {
         Task<IEnumerable<SessionViewModel>> GetAllAsync(CancellationToken ct = default);
         Task<Result<SessionViewModel>> GetDetailsAsync(int id, CancellationToken ct = default);
+        Task<SessionLookups> GetLookupsAsync(CancellationToken ct = default);
+        Task<Result> CreateAsync(SessionCreateViewModel model, CancellationToken ct = default);
     }
 }

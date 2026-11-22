@@ -18,5 +18,12 @@ namespace GymManagementSystem_DAL.Repositories
                 .Include(s => s.Trainer)
                 .Include(s => s.Category)
                 .Include(s => s.Bookings);
+
+        public async Task<bool> HasTrainerConflictAsync(int trainerId, DateTime startUtc, DateTime endUtc, int? excludeSessionId = null, CancellationToken ct = default)
+            => await _dbSet.AnyAsync(s =>
+                s.TrainerId == trainerId
+                && (excludeSessionId == null || s.Id != excludeSessionId)
+                && s.StartDate < endUtc
+                && s.EndDate > startUtc, ct);
     }
 }
