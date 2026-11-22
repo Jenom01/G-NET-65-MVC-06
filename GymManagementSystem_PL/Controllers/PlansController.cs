@@ -13,19 +13,19 @@ namespace GymManagementSystem_PL.Controllers
 
         [HttpGet]
         public async Task<IActionResult> Details(int id, CancellationToken ct)
-        {
-            var result = await plans.GetDetailsAsync(id, ct);
-
-            return result.IsFailure ? NotFound() : View(result.Value);
-        }
+            => await plans.GetDetailsAsync(id, ct) switch
+            {
+                PlanViewModel plan => View(plan),
+                Error => NotFound()
+            };
 
         [HttpGet]
         public async Task<IActionResult> Edit(int id, CancellationToken ct)
-        {
-            var result = await plans.GetForUpdateAsync(id, ct);
-
-            return result.IsFailure ? NotFound() : View(result.Value);
-        }
+            => await plans.GetForUpdateAsync(id, ct) switch
+            {
+                PlanEditViewModel plan => View(plan),
+                Error => NotFound()
+            };
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -35,16 +35,16 @@ namespace GymManagementSystem_PL.Controllers
 
             var result = await plans.UpdateAsync(id, model, ct);
 
-            if (result.IsSuccess)
+            if (result is Error error)
             {
-                TempData["Success"] = "Plan updated successfully";
-                return RedirectToAction(nameof(Index));
+                if (error.Type == ErrorType.NotFound) return NotFound();
+
+                ModelState.AddError(error);
+                return View(model);
             }
 
-            if (result.Error.Type == ErrorType.NotFound) return NotFound();
-
-            ModelState.AddError(result.Error);
-            return View(model);
+            TempData["Success"] = "Plan updated successfully";
+            return RedirectToAction(nameof(Index));
         }
 
         [HttpPost]
@@ -53,12 +53,12 @@ namespace GymManagementSystem_PL.Controllers
         {
             var result = await plans.ToggleStatusAsync(id, ct);
 
-            if (result.IsFailure && result.Error.Type == ErrorType.NotFound) return NotFound();
+            if (result is Error { Type: ErrorType.NotFound }) return NotFound();
 
-            if (result.IsSuccess)
-                TempData["Success"] = "Plan Status Changed";
+            if (result is Error error)
+                TempData["Error"] = error.Message;
             else
-                TempData["Error"] = result.Error.Message;
+                TempData["Success"] = "Plan Status Changed";
 
             return RedirectToAction(nameof(Index));
         }

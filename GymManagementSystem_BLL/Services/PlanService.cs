@@ -45,7 +45,7 @@ namespace GymManagementSystem_BLL.Services
             await uow.SaveChangesAsync(ct);
 
             logger.LogInformation("Plan {PlanId} updated", id);
-            return Result.Success();
+            return new Ok();
         }
 
         public async Task<Result> ToggleStatusAsync(int id, CancellationToken ct = default)
@@ -61,7 +61,7 @@ namespace GymManagementSystem_BLL.Services
             await uow.SaveChangesAsync(ct);
 
             logger.LogInformation("{PlanName} plan is now {Status}", plan.Name, plan.IsActive ? "active" : "inactive");
-            return Result.Success();
+            return new Ok();
         }
     }
 }

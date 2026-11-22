@@ -23,9 +23,9 @@ namespace GymManagementSystem_PL.Controllers
 
             var result = await trainers.CreateAsync(model, ct);
 
-            if (result.IsFailure)
+            if (result is Error error)
             {
-                ModelState.AddError(result.Error);
+                ModelState.AddError(error);
                 return View(model);
             }
 
@@ -35,19 +35,19 @@ namespace GymManagementSystem_PL.Controllers
 
         [HttpGet]
         public async Task<IActionResult> Details(int id, CancellationToken ct)
-        {
-            var result = await trainers.GetDetailsAsync(id, ct);
-
-            return result.IsFailure ? NotFound() : View(result.Value);
-        }
+            => await trainers.GetDetailsAsync(id, ct) switch
+            {
+                TrainerDetailsViewModel trainer => View(trainer),
+                Error => NotFound()
+            };
 
         [HttpGet]
         public async Task<IActionResult> Edit(int id, CancellationToken ct)
-        {
-            var result = await trainers.GetForUpdateAsync(id, ct);
-
-            return result.IsFailure ? NotFound() : View(result.Value);
-        }
+            => await trainers.GetForUpdateAsync(id, ct) switch
+            {
+                TrainerEditViewModel trainer => View(trainer),
+                Error => NotFound()
+            };
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -57,25 +57,25 @@ namespace GymManagementSystem_PL.Controllers
 
             var result = await trainers.UpdateAsync(id, model, ct);
 
-            if (result.IsSuccess)
+            if (result is Error error)
             {
-                TempData["Success"] = "Trainer updated successfully";
-                return RedirectToAction(nameof(Index));
+                if (error.Type == ErrorType.NotFound) return NotFound();
+
+                ModelState.AddError(error);
+                return View(model);
             }
 
-            if (result.Error.Type == ErrorType.NotFound) return NotFound();
-
-            ModelState.AddError(result.Error);
-            return View(model);
+            TempData["Success"] = "Trainer updated successfully";
+            return RedirectToAction(nameof(Index));
         }
 
         [HttpGet]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
-        {
-            var result = await trainers.GetDetailsAsync(id, ct);
-
-            return result.IsFailure ? NotFound() : View(result.Value);
-        }
+            => await trainers.GetDetailsAsync(id, ct) switch
+            {
+                TrainerDetailsViewModel trainer => View(trainer),
+                Error => NotFound()
+            };
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -84,12 +84,12 @@ namespace GymManagementSystem_PL.Controllers
         {
             var result = await trainers.DeleteAsync(id, ct);
 
-            if (result.IsFailure && result.Error.Type == ErrorType.NotFound) return NotFound();
+            if (result is Error { Type: ErrorType.NotFound }) return NotFound();
 
-            if (result.IsSuccess)
-                TempData["Success"] = "Trainer deleted successfully";
+            if (result is Error error)
+                TempData["Error"] = error.Message;
             else
-                TempData["Error"] = result.Error.Message;
+                TempData["Success"] = "Trainer deleted successfully";
 
             return RedirectToAction(nameof(Index));
         }

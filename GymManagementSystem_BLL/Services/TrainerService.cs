@@ -31,7 +31,7 @@ namespace GymManagementSystem_BLL.Services
             await uow.SaveChangesAsync(ct);
 
             logger.LogInformation("Trainer {TrainerId} created", trainer.Id);
-            return Result.Success();
+            return new Ok();
         }
 
         public async Task<Result<TrainerDetailsViewModel>> GetDetailsAsync(int id, CancellationToken ct = default)
@@ -71,7 +71,7 @@ namespace GymManagementSystem_BLL.Services
             await uow.SaveChangesAsync(ct);
 
             logger.LogInformation("Trainer {TrainerId} updated", id);
-            return Result.Success();
+            return new Ok();
         }
 
         public async Task<Result> DeleteAsync(int id, CancellationToken ct = default)
@@ -87,7 +87,7 @@ namespace GymManagementSystem_BLL.Services
             await uow.SaveChangesAsync(ct);
 
             logger.LogInformation("Trainer {TrainerId} deleted", id);
-            return Result.Success();
+            return new Ok();
         }
     }
 }
