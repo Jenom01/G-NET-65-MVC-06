@@ -9,6 +9,8 @@ namespace GymManagementSystem_DAL.Data.Seed
         {
             if (await dbContext.Memberships.AnyAsync()) return;
 
+            var rows = await SeedReader.ReadAsync<MembershipSeed>("memberships.json");
+
             var members = await dbContext.Set<Member>()
                 .AsNoTracking()
                 .ToDictionaryAsync(m => m.Email, m => m.Id);
@@ -18,16 +20,23 @@ namespace GymManagementSystem_DAL.Data.Seed
                 .ToDictionaryAsync(p => p.Name, p => new { p.Id, p.DurationDays });
 
             var now = DateTime.UtcNow;
+            var problems = new SeedProblems("memberships.json");
             var memberships = new List<Membership>();
 
-            // startOffsetDays is negative = started in the past; EndDate comes from the plan's duration
-            void Add(string email, string planName, int startOffsetDays)
+            foreach (var row in rows)
             {
-                if (!members.TryGetValue(email, out var memberId)) return;
-                if (!plans.TryGetValue(planName, out var plan)) return;
+                if (!members.TryGetValue(row.MemberEmail, out var memberId))
+                {
+                    problems.Add($"unknown member '{row.MemberEmail}'");
+                    continue;
+                }
+                if (!plans.TryGetValue(row.Plan, out var plan))
+                {
+                    problems.Add($"unknown plan '{row.Plan}' (member {row.MemberEmail})");
+                    continue;
+                }
 
-                var start = now.AddDays(startOffsetDays);
-
+                var start = now.AddDays(row.StartOffsetDays);
                 memberships.Add(new Membership
                 {
                     MemberId = memberId,
@@ -37,25 +46,7 @@ namespace GymManagementSystem_DAL.Data.Seed
                 });
             }
 
-            // Ahmed: expired Quarterly, then an active Annual
-            Add("ahmed.hassan@example.com", "Quarterly", -180);   // ended ~90 days ago
-            Add("ahmed.hassan@example.com", "Annual", -60);       // active
-
-            // Sara: expired Monthly, then an active Monthly (renewal)
-            Add("sara.mahmoud@example.com", "Monthly", -120);     // expired
-            Add("sara.mahmoud@example.com", "Monthly", -10);      // active
-
-            // Omar: active Quarterly
-            Add("omar.khaled@example.com", "Quarterly", -30);     // active
-
-            // Nour: expired Weekly Pass, then an active Monthly
-            Add("nour.ibrahim@example.com", "Weekly Pass", -20);  // expired
-            Add("nour.ibrahim@example.com", "Monthly", -3);       // active
-
-            // Youssef: only an expired Weekly Pass (no active membership)
-            Add("youssef.adel@example.com", "Weekly Pass", -40);  // expired
-
-            // Mariam: intentionally no membership (tests the "no membership" case)
+            problems.ThrowIfAny();
 
             await dbContext.Memberships.AddRangeAsync(memberships);
             await dbContext.SaveChangesAsync();

@@ -14,5 +14,11 @@
     </PackageReference>
 	<PackageReference Include="System.Security.Cryptography.Pkcs" Version="11.0.0" />
   </ItemGroup>
+	
+  <ItemGroup>
+    <None Update="Data\Seed\Files\*.json">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
 </Project>
