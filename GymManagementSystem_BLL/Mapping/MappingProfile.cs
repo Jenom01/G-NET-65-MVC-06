@@ -109,6 +109,11 @@ namespace GymManagementSystem_BLL.Mapping
                 .ForMember(d => d.Trainer, o => o.Ignore())
                 .ForMember(d => d.Category, o => o.Ignore())
                 .ForMember(d => d.Bookings, o => o.Ignore());
+
+            CreateMap<Session, SessionEditViewModel>()
+                .ForMember(d => d.CategoryName, o => o.MapFrom(s => s.Category.Name))
+                .ForMember(d => d.StartDate, o => o.Ignore())
+                .ForMember(d => d.EndDate, o => o.Ignore());
         }
     }
 }

@@ -11,15 +11,15 @@ using Microsoft.Extensions.Logging;
 
 namespace GymManagementSystem_BLL.Services
 {
-    public class SessionService(IUnitOfWork uow, IMapper mapper, ILogger<SessionService> logger) : ISessionService
+    public class SessionService(IUnitOfWork uow, IMapper mapper, ILogger<SessionService> logger, TimeProvider clock)
+        : ISessionService
     {
-        private static readonly TimeZoneInfo GymTimeZone =
-            TimeZoneInfo.FindSystemTimeZoneById("Africa/Cairo");
+        private DateTime NowUtc => clock.GetUtcNow().UtcDateTime;
 
         public async Task<IEnumerable<SessionViewModel>> GetAllAsync(CancellationToken ct = default)
         {
             var sessions = await uow.Sessions.GetAllWithDetailsAsync(ct);
-            var now = DateTime.UtcNow;
+            var now = NowUtc;
 
             return sessions
                 .Select(s => ToViewModel(s, now))
@@ -31,57 +31,34 @@ namespace GymManagementSystem_BLL.Services
         public async Task<Result<SessionViewModel>> GetDetailsAsync(int id, CancellationToken ct = default)
         {
             var session = await uow.Sessions.GetDetailsAsync(id, ct);
-
             if (session is null) return SessionErrors.NotFound;
 
-            return ToViewModel(session, DateTime.UtcNow);
+            return ToViewModel(session, NowUtc);
         }
 
-        public async Task<SessionLookups> GetLookupsAsync(CancellationToken ct = default)
+        public async Task<IReadOnlyList<LookupItem>> GetCategoryLookupsAsync(CancellationToken ct = default)
         {
             var categories = await uow.Categories.GetAllAsync(ct);
-            var trainers = await uow.Trainers.GetAllAsync(ct);
+            return categories.OrderBy(c => c.Name).Select(c => new LookupItem(c.Id, c.Name)).ToList();
+        }
 
-            return new SessionLookups(
-                categories.OrderBy(c => c.Name).Select(c => new LookupItem(c.Id, c.Name)).ToList(),
-                trainers.OrderBy(t => t.Name)
-                        .Select(t => new LookupItem(t.Id, $"{t.Name} ({t.Speciality.GetDisplayName()})"))
-                        .ToList());
+        public async Task<IReadOnlyList<LookupItem>> GetTrainerLookupsAsync(CancellationToken ct = default)
+        {
+            var trainers = await uow.Trainers.GetAllAsync(ct);
+            return trainers.OrderBy(t => t.Name)
+                           .Select(t => new LookupItem(t.Id, $"{t.Name} ({t.Speciality.GetDisplayName()})"))
+                           .ToList();
         }
 
         public async Task<Result> CreateAsync(SessionCreateViewModel model, CancellationToken ct = default)
         {
-            // 1. The form sends Cairo wall-clock time with no zone. The DB stores UTC.
-            var startLocal = DateTime.SpecifyKind(model.StartDate!.Value, DateTimeKind.Unspecified);
-            var endLocal = DateTime.SpecifyKind(model.EndDate!.Value, DateTimeKind.Unspecified);
+            var (error, startUtc, endUtc) = await ValidateScheduleAsync(
+                model.CategoryId!.Value, model.TrainerId!.Value,
+                model.StartDate!.Value, model.EndDate!.Value,
+                excludeSessionId: null, NowUtc, ct);
 
-            if (endLocal <= startLocal) return Reject(SessionErrors.InvalidDateRange, model);
+            if (error is not null) return Reject(error, "create");
 
-            if (GymTimeZone.IsInvalidTime(startLocal) || GymTimeZone.IsInvalidTime(endLocal))
-                return Reject(SessionErrors.InvalidLocalTime, model);
-
-            var startUtc = TimeZoneInfo.ConvertTimeToUtc(startLocal, GymTimeZone);
-            var endUtc = TimeZoneInfo.ConvertTimeToUtc(endLocal, GymTimeZone);
-
-            // 2. Start must be in the future (compared in UTC)
-            if (startUtc <= DateTime.UtcNow) return Reject(SessionErrors.StartInPast, model);
-
-            // 3. Lookups exist
-            var category = await uow.Categories.GetByIdAsync(model.CategoryId!.Value, ct);
-            if (category is null) return Reject(SessionErrors.CategoryNotFound, model);
-
-            var trainer = await uow.Trainers.GetByIdAsync(model.TrainerId!.Value, ct);
-            if (trainer is null) return Reject(SessionErrors.TrainerNotFound, model);
-
-            // 4. Specialty must match category (Category.Name is "Strength Training", the enum's Display name)
-            if (!string.Equals(trainer.Speciality.GetDisplayName(), category.Name, StringComparison.OrdinalIgnoreCase))
-                return Reject(SessionErrors.SpecialityMismatch, model);
-
-            // 5. No double-booking
-            if (await uow.Sessions.HasTrainerConflictAsync(trainer.Id, startUtc, endUtc, ct: ct))
-                return Reject(SessionErrors.TrainerBusy, model);
-
-            // 6. Save
             var session = mapper.Map<Session>(model);
             session.StartDate = startUtc;
             session.EndDate = endUtc;
@@ -96,22 +73,95 @@ namespace GymManagementSystem_BLL.Services
             return new Ok();
         }
 
+        public async Task<Result<SessionEditViewModel>> GetForUpdateAsync(int id, CancellationToken ct = default)
+        {
+            var session = await uow.Sessions.GetByIdAsync(id, ct, s => s.Category);
+            if (session is null) return SessionErrors.NotFound;
+
+            if (!IsEditable(session, NowUtc)) return SessionErrors.NotEditable;
+
+            var vm = mapper.Map<SessionEditViewModel>(session);
+            vm.StartDate = GymTime.ToLocalMinute(session.StartDate);
+            vm.EndDate = GymTime.ToLocalMinute(session.EndDate);
+            return vm;
+        }
+
+        public async Task<Result> UpdateAsync(int id, SessionEditViewModel model, CancellationToken ct = default)
+        {
+            var session = await uow.Sessions.GetByIdAsync(id, ct);
+            if (session is null) return SessionErrors.NotFound;
+
+            var now = NowUtc;
+            if (!IsEditable(session, now)) return Reject(SessionErrors.NotEditable, "update");
+
+            var (error, startUtc, endUtc) = await ValidateScheduleAsync(
+                session.CategoryId, model.TrainerId!.Value,
+                model.StartDate!.Value, model.EndDate!.Value,
+                excludeSessionId: session.Id, now, ct);
+
+            if (error is not null) return Reject(error, "update");
+
+            session.TrainerId = model.TrainerId.Value;
+            session.Description = model.Description;
+            session.StartDate = startUtc;
+            session.EndDate = endUtc;
+
+            uow.Sessions.Update(session);
+            await uow.SaveChangesAsync(ct);
+
+            logger.LogInformation(
+                "Session {SessionId} updated: trainer {TrainerId}, {StartUtc:u} to {EndUtc:u}",
+                session.Id, session.TrainerId, startUtc, endUtc);
+
+            return new Ok();
+        }
+
+        private static bool IsEditable(Session session, DateTime nowUtc)
+            => session.GetStatus(nowUtc) == SessionStatus.Upcoming;
+
         private SessionViewModel ToViewModel(Session session, DateTime nowUtc)
         {
             var model = mapper.Map<SessionViewModel>(session);
 
             model.Status = session.GetStatus(nowUtc);
-            model.StartDate = TimeZoneInfo.ConvertTimeFromUtc(session.StartDate, GymTimeZone);
-            model.EndDate = TimeZoneInfo.ConvertTimeFromUtc(session.EndDate, GymTimeZone);
+            model.StartDate = GymTime.ToLocal(session.StartDate);
+            model.EndDate = GymTime.ToLocal(session.EndDate);
 
             return model;
         }
 
-        private Error Reject(Error error, SessionCreateViewModel model)
+        private async Task<(Error? Error, DateTime StartUtc, DateTime EndUtc)> ValidateScheduleAsync(
+            int categoryId, int trainerId, DateTime start, DateTime end,
+            int? excludeSessionId, DateTime nowUtc, CancellationToken ct)
         {
-            logger.LogInformation(
-                "Session create rejected: {ErrorCode} (trainer {TrainerId}, category {CategoryId})",
-                error.Code, model.TrainerId, model.CategoryId);
+            if (end <= start) return (SessionErrors.InvalidDateRange, default, default);
+
+            if (GymTime.IsInvalid(start) || GymTime.IsInvalid(end))
+                return (SessionErrors.InvalidLocalTime, default, default);
+
+            var startUtc = GymTime.ToUtc(start);
+            var endUtc = GymTime.ToUtc(end);
+
+            if (startUtc <= nowUtc) return (SessionErrors.StartInPast, default, default);
+
+            var category = await uow.Categories.GetByIdAsync(categoryId, ct);
+            if (category is null) return (SessionErrors.CategoryNotFound, default, default);
+
+            var trainer = await uow.Trainers.GetByIdAsync(trainerId, ct);
+            if (trainer is null) return (SessionErrors.TrainerNotFound, default, default);
+
+            if (!string.Equals(trainer.Speciality.GetDisplayName(), category.Name, StringComparison.OrdinalIgnoreCase))
+                return (SessionErrors.SpecialityMismatch, default, default);
+
+            if (await uow.Sessions.HasTrainerConflictAsync(trainerId, startUtc, endUtc, excludeSessionId, ct))
+                return (SessionErrors.TrainerBusy, default, default);
+
+            return (null, startUtc, endUtc);
+        }
+
+        private Error Reject(Error error, string operation)
+        {
+            logger.LogInformation("Session {Operation} rejected: {ErrorCode}", operation, error.Code);
             return error;
         }
     }

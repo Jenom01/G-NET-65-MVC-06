@@ -4,8 +4,8 @@ namespace GymManagementSystem_BLL.Errors
 {
     public static class SessionErrors
     {
-        public static readonly Error NotFound =
-            new("Session.NotFound", "Session not found.", ErrorType.NotFound);
+        public static readonly Error NotFound = new("Session.NotFound",
+            "Session not found.", ErrorType.NotFound);
 
         public static readonly Error InvalidDateRange = new("Session.InvalidDateRange",
             "End time must be after start time", ErrorType.Validation, "EndDate");
@@ -27,5 +27,8 @@ namespace GymManagementSystem_BLL.Errors
 
         public static readonly Error TrainerBusy = new("Session.TrainerBusy",
             "This trainer already has a session in that time slot", ErrorType.Conflict, "TrainerId");
+
+        public static readonly Error NotEditable = new("Session.NotEditable",
+            "Only upcoming sessions can be edited", ErrorType.Conflict);
     }
 }

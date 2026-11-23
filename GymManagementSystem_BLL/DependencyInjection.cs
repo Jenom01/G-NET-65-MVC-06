@@ -12,6 +12,8 @@ namespace GymManagementSystem_BLL
             services.AddScoped<ISessionService, SessionService>();
             services.AddScoped<ITrainerService, TrainerService>();
 
+            services.AddSingleton(TimeProvider.System);
+
             services.AddAutoMapper(cfg => cfg.AddMaps(typeof(DependencyInjection).Assembly));
 
             return services;
