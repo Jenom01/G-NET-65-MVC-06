@@ -7,10 +7,11 @@ using GymManagementSystem_BLL.ViewModels.Sessions;
 using GymManagementSystem_DAL.Enums;
 using GymManagementSystem_DAL.Models;
 using GymManagementSystem_DAL.Repositories;
+using Microsoft.Extensions.Logging;
 
 namespace GymManagementSystem_BLL.Services
 {
-    public class SessionService(IUnitOfWork uow, IMapper mapper) : ISessionService
+    public class SessionService(IUnitOfWork uow, IMapper mapper, ILogger<SessionService> logger) : ISessionService
     {
         private static readonly TimeZoneInfo GymTimeZone =
             TimeZoneInfo.FindSystemTimeZoneById("Africa/Cairo");
@@ -54,31 +55,31 @@ namespace GymManagementSystem_BLL.Services
             var startLocal = DateTime.SpecifyKind(model.StartDate!.Value, DateTimeKind.Unspecified);
             var endLocal = DateTime.SpecifyKind(model.EndDate!.Value, DateTimeKind.Unspecified);
 
-            if (endLocal <= startLocal) return SessionErrors.InvalidDateRange;
+            if (endLocal <= startLocal) return Reject(SessionErrors.InvalidDateRange, model);
 
             if (GymTimeZone.IsInvalidTime(startLocal) || GymTimeZone.IsInvalidTime(endLocal))
-                return SessionErrors.InvalidLocalTime;
+                return Reject(SessionErrors.InvalidLocalTime, model);
 
             var startUtc = TimeZoneInfo.ConvertTimeToUtc(startLocal, GymTimeZone);
             var endUtc = TimeZoneInfo.ConvertTimeToUtc(endLocal, GymTimeZone);
 
             // 2. Start must be in the future (compared in UTC)
-            if (startUtc <= DateTime.UtcNow) return SessionErrors.StartInPast;
+            if (startUtc <= DateTime.UtcNow) return Reject(SessionErrors.StartInPast, model);
 
             // 3. Lookups exist
             var category = await uow.Categories.GetByIdAsync(model.CategoryId!.Value, ct);
-            if (category is null) return SessionErrors.CategoryNotFound;
+            if (category is null) return Reject(SessionErrors.CategoryNotFound, model);
 
             var trainer = await uow.Trainers.GetByIdAsync(model.TrainerId!.Value, ct);
-            if (trainer is null) return SessionErrors.TrainerNotFound;
+            if (trainer is null) return Reject(SessionErrors.TrainerNotFound, model);
 
             // 4. Specialty must match category (Category.Name is "Strength Training", the enum's Display name)
             if (!string.Equals(trainer.Speciality.GetDisplayName(), category.Name, StringComparison.OrdinalIgnoreCase))
-                return SessionErrors.SpecialityMismatch;
+                return Reject(SessionErrors.SpecialityMismatch, model);
 
             // 5. No double-booking
             if (await uow.Sessions.HasTrainerConflictAsync(trainer.Id, startUtc, endUtc, ct: ct))
-                return SessionErrors.TrainerBusy;
+                return Reject(SessionErrors.TrainerBusy, model);
 
             // 6. Save
             var session = mapper.Map<Session>(model);
@@ -87,6 +88,10 @@ namespace GymManagementSystem_BLL.Services
 
             uow.Sessions.Add(session);
             await uow.SaveChangesAsync(ct);
+
+            logger.LogInformation(
+                "Session {SessionId} created: trainer {TrainerId}, category {CategoryId}, {StartUtc:u} to {EndUtc:u}",
+                session.Id, session.TrainerId, session.CategoryId, startUtc, endUtc);
 
             return new Ok();
         }
@@ -100,6 +105,14 @@ namespace GymManagementSystem_BLL.Services
             model.EndDate = TimeZoneInfo.ConvertTimeFromUtc(session.EndDate, GymTimeZone);
 
             return model;
+        }
+
+        private Error Reject(Error error, SessionCreateViewModel model)
+        {
+            logger.LogInformation(
+                "Session create rejected: {ErrorCode} (trainer {TrainerId}, category {CategoryId})",
+                error.Code, model.TrainerId, model.CategoryId);
+            return error;
         }
     }
 }
