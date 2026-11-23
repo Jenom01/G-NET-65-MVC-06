@@ -13,5 +13,7 @@ namespace GymManagementSystem_BLL.Services
         Task<Result> CreateAsync(SessionCreateViewModel model, CancellationToken ct = default);
         Task<Result<SessionEditViewModel>> GetForUpdateAsync(int id, CancellationToken ct = default);
         Task<Result> UpdateAsync(int id, SessionEditViewModel model, CancellationToken ct = default);
+        Task<Result<SessionViewModel>> GetForDeleteAsync(int id, CancellationToken ct = default);
+        Task<Result> DeleteAsync(int id, CancellationToken ct = default);
     }
 }

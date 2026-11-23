@@ -30,5 +30,8 @@ namespace GymManagementSystem_BLL.Errors
 
         public static readonly Error NotEditable = new("Session.NotEditable",
             "Only upcoming sessions can be edited", ErrorType.Conflict);
+
+        public static readonly Error CannotDeleteOngoing = new("Session.CannotDeleteOngoing",
+            "An ongoing session can't be deleted because members are training right now", ErrorType.Conflict);
     }
 }

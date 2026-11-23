@@ -33,7 +33,7 @@ namespace GymManagementSystem_PL.Controllers
 
             return await sessions.CreateAsync(model, ct) switch
             {
-                GymManagementSystem_BLL.Results.Ok => RedirectWithSuccess("Session created successfully"),
+                Ok _ => RedirectWithSuccess("Session created successfully"),
                 Error error => await CreateFormAsync(model, ct, error)
             };
         }
@@ -57,12 +57,32 @@ namespace GymManagementSystem_PL.Controllers
 
             return await sessions.UpdateAsync(id, model, ct) switch
             {
-                GymManagementSystem_BLL.Results.Ok => RedirectWithSuccess("Session updated successfully"),
+                Ok _ => RedirectWithSuccess("Session updated successfully"),
                 Error { Type: ErrorType.NotFound } => NotFound(),
                 Error { Field: null } error => RedirectWithError(error),   // not about one input, e.g. NotEditable
                 Error error => await EditFormAsync(model, ct, error)       // belongs to a field: show it on the form
             };
         }
+
+        [HttpGet]
+        public async Task<IActionResult> Delete(int id, CancellationToken ct)
+            => await sessions.GetForDeleteAsync(id, ct) switch
+            {
+                SessionViewModel session => View(session),
+                Error { Type: ErrorType.NotFound } => NotFound(),
+                Error error => RedirectWithError(error)
+            };
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [ActionName("Delete")]
+        public async Task<IActionResult> DeleteConfirmed(int id, CancellationToken ct)
+            => await sessions.DeleteAsync(id, ct) switch
+            {
+                Ok _ => RedirectWithSuccess("Session deleted successfully"),
+                Error { Type: ErrorType.NotFound } => NotFound(),
+                Error error => RedirectWithError(error)
+            };
 
         private async Task<IActionResult> CreateFormAsync(SessionCreateViewModel model, CancellationToken ct, Error? error = null)
         {

@@ -116,8 +116,42 @@ namespace GymManagementSystem_BLL.Services
             return new Ok();
         }
 
+        public async Task<Result<SessionViewModel>> GetForDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var session = await uow.Sessions.GetDetailsAsync(id, ct);
+            if (session is null) return SessionErrors.NotFound;
+
+            var now = NowUtc;
+            if (!IsDeletable(session, now)) return SessionErrors.CannotDeleteOngoing;
+
+            return ToViewModel(session, now);
+        }
+
+        public async Task<Result> DeleteAsync(int id, CancellationToken ct = default)
+        {
+            var session = await uow.Sessions.GetByIdAsync(id, ct, s => s.Bookings);
+            if (session is null) return SessionErrors.NotFound;
+
+            if (!IsDeletable(session, NowUtc)) return Reject(SessionErrors.CannotDeleteOngoing, "delete");
+
+            var bookingCount = session.Bookings.Count;
+
+            foreach (var booking in session.Bookings.ToList())
+                uow.Bookings.Delete(booking);
+
+            uow.Sessions.Delete(session);
+            await uow.SaveChangesAsync(ct);
+
+            logger.LogInformation("Session {SessionId} deleted with {BookingCount} bookings", id, bookingCount);
+
+            return new Ok();
+        }
+
         private static bool IsEditable(Session session, DateTime nowUtc)
             => session.GetStatus(nowUtc) == SessionStatus.Upcoming;
+
+        private static bool IsDeletable(Session session, DateTime nowUtc)
+            => session.GetStatus(nowUtc) != SessionStatus.Ongoing;
 
         private SessionViewModel ToViewModel(Session session, DateTime nowUtc)
         {
