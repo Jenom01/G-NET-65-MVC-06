@@ -3,6 +3,7 @@ using GymManagementSystem_BLL.Helpers;
 using GymManagementSystem_BLL.ViewModels.HealthRecords;
 using GymManagementSystem_BLL.ViewModels.Members;
 using GymManagementSystem_BLL.ViewModels.Plans;
+using GymManagementSystem_BLL.ViewModels.Sessions;
 using GymManagementSystem_BLL.ViewModels.Trainers;
 using GymManagementSystem_DAL.Models;
 using GymManagementSystem_DAL.Models.ValueObjects;
@@ -89,6 +90,30 @@ namespace GymManagementSystem_BLL.Mapping
             CreateMap<HealthRecord, HealthRecordDetailsViewModel>()
                 .ForMember(d => d.BloodType, o => o.MapFrom(s => s.BloodType.GetDisplayName()))
                 .ForMember(d => d.Note, o => o.MapFrom(s => s.Note ?? "No Notes"));
+
+            // ---------- Sessions ----------
+            CreateMap<Session, SessionViewModel>()
+                .ForMember(d => d.TrainerName, o => o.MapFrom(s => s.Trainer.Name))
+                .ForMember(d => d.CategoryName, o => o.MapFrom(s => s.Category.Name))
+                .ForMember(d => d.BookedCount, o => o.MapFrom(s => s.Bookings.Count))
+                .ForMember(d => d.Status, o => o.Ignore());
+
+            CreateMap<SessionCreateViewModel, Session>()
+                .ForMember(d => d.StartDate, o => o.Ignore())
+                .ForMember(d => d.EndDate, o => o.Ignore())
+                .ForMember(d => d.Id, o => o.Ignore())
+                .ForMember(d => d.CreatedAt, o => o.Ignore())
+                .ForMember(d => d.LastUpdatedAt, o => o.Ignore())
+                .ForMember(d => d.DeletedAt, o => o.Ignore())
+                .ForMember(d => d.IsDeleted, o => o.Ignore())
+                .ForMember(d => d.Trainer, o => o.Ignore())
+                .ForMember(d => d.Category, o => o.Ignore())
+                .ForMember(d => d.Bookings, o => o.Ignore());
+
+            CreateMap<Session, SessionEditViewModel>()
+                .ForMember(d => d.CategoryName, o => o.MapFrom(s => s.Category.Name))
+                .ForMember(d => d.StartDate, o => o.Ignore())
+                .ForMember(d => d.EndDate, o => o.Ignore());
         }
     }
 }

@@ -1,5 +1,7 @@
-﻿using GymManagementSystem_BLL.Services;
+﻿using GymManagementSystem_BLL.Results;
+using GymManagementSystem_BLL.Services;
 using GymManagementSystem_BLL.ViewModels.Plans;
+using GymManagementSystem_PL.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GymManagementSystem_PL.Controllers
@@ -11,23 +13,19 @@ namespace GymManagementSystem_PL.Controllers
 
         [HttpGet]
         public async Task<IActionResult> Details(int id, CancellationToken ct)
-        {
-            var plan = await plans.GetDetailsAsync(id, ct);
-
-            if (plan is null) return NotFound();
-
-            return View(plan);
-        }
+            => await plans.GetDetailsAsync(id, ct) switch
+            {
+                PlanViewModel plan => View(plan),
+                Error => NotFound()
+            };
 
         [HttpGet]
         public async Task<IActionResult> Edit(int id, CancellationToken ct)
-        {
-            var plan = await plans.GetForUpdateAsync(id, ct);
-
-            if (plan is null) return NotFound();
-
-            return View(plan);
-        }
+            => await plans.GetForUpdateAsync(id, ct) switch
+            {
+                PlanEditViewModel plan => View(plan),
+                Error => NotFound()
+            };
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -37,19 +35,16 @@ namespace GymManagementSystem_PL.Controllers
 
             var result = await plans.UpdateAsync(id, model, ct);
 
-            switch (result)
+            if (result is Error error)
             {
-                case PlanResult.NotFound:
-                    return NotFound();
+                if (error.Type == ErrorType.NotFound) return NotFound();
 
-                case PlanResult.HasActiveMemberships:
-                    ModelState.AddModelError(string.Empty, "Cannot update a plan that has active memberships");
-                    return View(model);
-
-                default:
-                    TempData["Success"] = "Plan updated successfully";
-                    return RedirectToAction(nameof(Index));
+                ModelState.AddError(error);
+                return View(model);
             }
+
+            TempData["Success"] = "Plan updated successfully";
+            return RedirectToAction(nameof(Index));
         }
 
         [HttpPost]
@@ -58,19 +53,12 @@ namespace GymManagementSystem_PL.Controllers
         {
             var result = await plans.ToggleStatusAsync(id, ct);
 
-            switch (result)
-            {
-                case PlanResult.NotFound:
-                    return NotFound();
+            if (result is Error { Type: ErrorType.NotFound }) return NotFound();
 
-                case PlanResult.HasActiveMemberships:
-                    TempData["Error"] = "Cannot deactivate a plan that has active memberships";
-                    break;
-
-                default:
-                    TempData["Success"] = "Plan Status Changed";
-                    break;
-            }
+            if (result is Error error)
+                TempData["Error"] = error.Message;
+            else
+                TempData["Success"] = "Plan Status Changed";
 
             return RedirectToAction(nameof(Index));
         }

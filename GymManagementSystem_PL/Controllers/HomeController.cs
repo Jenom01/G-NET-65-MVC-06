@@ -1,12 +1,11 @@
+using GymManagementSystem_BLL.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GymManagementSystem_PL.Controllers
 {
-    public class HomeController : Controller
+    public class HomeController(IAnalyticsService analytics) : Controller
     {
-        public IActionResult Index()
-        {
-            return View();
-        }
+        public async Task<IActionResult> Index(CancellationToken ct)
+            => View(await analytics.GetDashboardAsync(ct));
     }
 }

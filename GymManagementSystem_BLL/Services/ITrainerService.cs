@@ -1,14 +1,15 @@
-﻿using GymManagementSystem_BLL.ViewModels.Trainers;
+﻿using GymManagementSystem_BLL.Results;
+using GymManagementSystem_BLL.ViewModels.Trainers;
 
 namespace GymManagementSystem_BLL.Services
 {
     public interface ITrainerService
     {
         Task<IEnumerable<TrainerViewModel>> GetAllAsync(CancellationToken ct = default);
-        Task<TrainerResult> CreateAsync(TrainerCreateViewModel model, CancellationToken ct = default);
-        Task<TrainerDetailsViewModel?> GetDetailsAsync(int id, CancellationToken ct = default);
-        Task<TrainerEditViewModel?> GetForUpdateAsync(int id, CancellationToken ct = default);
-        Task<TrainerResult> UpdateAsync(int id, TrainerEditViewModel model, CancellationToken ct = default);
-        Task<TrainerResult> DeleteAsync(int id, CancellationToken ct = default);
+        Task<Result> CreateAsync(TrainerCreateViewModel model, CancellationToken ct = default);
+        Task<Result<TrainerDetailsViewModel>> GetDetailsAsync(int id, CancellationToken ct = default);
+        Task<Result<TrainerEditViewModel>> GetForUpdateAsync(int id, CancellationToken ct = default);
+        Task<Result> UpdateAsync(int id, TrainerEditViewModel model, CancellationToken ct = default);
+        Task<Result> DeleteAsync(int id, CancellationToken ct = default);
     }
 }

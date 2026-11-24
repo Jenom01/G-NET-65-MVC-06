@@ -9,17 +9,7 @@ namespace GymManagementSystem_DAL.Data.Seed
         {
             if (await dbContext.Categories.AnyAsync()) return;
 
-            var categories = new List<Category>
-            {
-                new() { Name = "Boxing" },
-                new() { Name = "Yoga" },
-                new() { Name = "CrossFit" },
-                new() { Name = "Pilates" },
-                new() { Name = "Zumba" },
-                new() { Name = "Cycling" },
-                new() { Name = "Strength Training" },
-                new() { Name = "Cardio" }
-            };
+            var categories = await SeedReader.ReadAsync<Category>("categories.json");
 
             await dbContext.Categories.AddRangeAsync(categories);
             await dbContext.SaveChangesAsync();

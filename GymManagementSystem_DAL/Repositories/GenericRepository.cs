@@ -32,6 +32,11 @@ namespace GymManagementSystem_DAL.Repositories
         public async Task<bool> AnyAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
             => await _dbSet.AnyAsync(predicate, ct);
 
+        public async Task<int> CountAsync(Expression<Func<TEntity, bool>>? predicate = null, CancellationToken ct = default)
+            => predicate is null
+                ? await _dbSet.CountAsync(ct)
+                : await _dbSet.CountAsync(predicate, ct);
+
         public void Add(TEntity entity)
             => _dbSet.Add(entity);
 
