@@ -14,6 +14,7 @@ namespace GymManagementSystem_DAL.Repositories
 
         Task<bool> ExistsAsync(int id, CancellationToken ct = default);
         Task<bool> AnyAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default);
+        Task<int> CountAsync(Expression<Func<TEntity, bool>>? predicate = null, CancellationToken ct = default);
 
         void Add(TEntity entity);
         void Update(TEntity entity);
